@@ -1,17 +1,15 @@
 import Foundation
+import FirebaseFunctions
 
+/// Talks to the `generateProposal` Cloud Function. The Anthropic API key lives
+/// server-side as a Cloud secret — it is NEVER bundled in the app. Only
+/// signed-in Firebase users can invoke the function.
 final class AIService {
     static let shared = AIService()
     private init() {}
 
-    // Set your Anthropic API key in Info.plist as "ANTHROPIC_API_KEY"
-    private var apiKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "ANTHROPIC_API_KEY") as? String ?? ""
-    }
-
-    private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-
-    // MARK: - Generate story continuation
+    // Must match the region the function is deployed to.
+    private lazy var functions = Functions.functions(region: "europe-west3")
 
     func generateProposal(
         story: Story,
@@ -19,73 +17,30 @@ final class AIService {
         chapterTitle: String,
         userInstruction: String
     ) async throws -> String {
-        let systemPrompt = """
-        You are a creative co-author collaborating on a story titled "\(story.title)".
-        Synopsis: \(story.synopsis)
-
-        Your role is to propose the next chapter continuation based on the story so far.
-        Write in a compelling narrative style. Keep proposals between 200-400 words.
-        Match the tone and voice already established in the story.
-        """
-
-        let userMessage = """
-        Story so far:
-        \(canonSoFar.isEmpty ? "(Story is just beginning)" : canonSoFar)
-
-        Chapter to continue: \(chapterTitle)
-
-        Additional direction from collaborator: \(userInstruction.isEmpty ? "Surprise us!" : userInstruction)
-
-        Write the next chapter proposal:
-        """
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-
-        let body: [String: Any] = [
-            "model": "claude-sonnet-4-6",
-            "max_tokens": 600,
-            "system": systemPrompt,
-            "messages": [
-                ["role": "user", "content": userMessage]
-            ]
+        let payload: [String: Any] = [
+            "storyTitle": story.title,
+            "synopsis": story.synopsis,
+            "canonSoFar": canonSoFar,
+            "chapterTitle": chapterTitle,
+            "userInstruction": userInstruction
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw AIError.apiError("No response from the server.")
-        }
-        guard http.statusCode == 200 else {
-            // Surface the real Anthropic error message (e.g. low credit balance,
-            // invalid key, rate limit) instead of a generic failure.
-            if let apiErr = try? JSONDecoder().decode(AnthropicError.self, from: data) {
-                throw AIError.apiError(apiErr.error.message)
+        do {
+            let result = try await functions.httpsCallable("generateProposal").call(payload)
+            guard
+                let dict = result.data as? [String: Any],
+                let text = dict["text"] as? String,
+                !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else {
+                throw AIError.apiError("The AI returned an empty response.")
             }
-            throw AIError.apiError("Request failed (HTTP \(http.statusCode)).")
+            return text
+        } catch let error as NSError {
+            // Cloud Functions surfaces the server-side message (e.g. low credit
+            // balance) in localizedDescription.
+            throw AIError.apiError(error.localizedDescription)
         }
-
-        let decoded = try JSONDecoder().decode(AnthropicResponse.self, from: data)
-        return decoded.content.first?.text ?? ""
     }
-}
-
-// MARK: - Response models
-
-private struct AnthropicResponse: Decodable {
-    let content: [ContentBlock]
-}
-
-private struct ContentBlock: Decodable {
-    let text: String
-}
-
-private struct AnthropicError: Decodable {
-    struct Detail: Decodable { let message: String }
-    let error: Detail
 }
 
 enum AIError: LocalizedError {

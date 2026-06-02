@@ -1,0 +1,12 @@
+{
+  "name": "storyforge-functions",
+  "description": "Cloud Functions for StoryForge (AI proposal proxy)",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-functions": "^7.2.5"
+  },
+  "private": true
+}

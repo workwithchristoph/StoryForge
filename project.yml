@@ -21,9 +21,6 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
-    configFiles:
-      Debug: Secrets.xcconfig
-      Release: Secrets.xcconfig
     sources:
       - path: StoryForge
         excludes:
@@ -47,6 +44,8 @@ targets:
         product: FirebaseFirestore
       - package: Firebase
         product: FirebaseStorage
+      - package: Firebase
+        product: FirebaseFunctions
     info:
       path: StoryForge/Info.plist
       properties:
@@ -59,4 +58,3 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
-        ANTHROPIC_API_KEY: "$(ANTHROPIC_API_KEY)"

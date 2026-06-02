@@ -65,21 +65,24 @@ service cloud.firestore {
 2. In Apple Developer portal → Identifiers → your App ID → enable Sign In with Apple
 3. In Firebase Console → Auth → Apple → add your Service ID
 
-## 5. Anthropic API Key (stored in a git-ignored xcconfig)
+## 5. Anthropic API Key (stored server-side, never in the app)
 
-The key is **not** committed. It lives in `Secrets.xcconfig` (git-ignored) and is
-injected into the build via a build setting that `Info.plist` references as
-`$(ANTHROPIC_API_KEY)`.
+The AI co-author runs through a Firebase Cloud Function (`functions/index.js`,
+`generateProposal`). The Anthropic key is stored as a Cloud secret (Google Secret
+Manager) and is **never bundled in the app**, so the app is safe to distribute.
 
 To set it up:
-1. Get your key at console.anthropic.com
-2. Copy the template: `cp Secrets.xcconfig.example Secrets.xcconfig`
-3. Open `Secrets.xcconfig` and set `ANTHROPIC_API_KEY = sk-ant-...`
-4. Run `xcodegen generate` (the `configFiles` entry in `project.yml` wires it in)
+1. Get your key at console.anthropic.com (add credits under Plans & Billing)
+2. Upgrade the Firebase project to the **Blaze** plan — Cloud Functions require it
+   (the free tier covers typical usage):
+   https://console.firebase.google.com/project/_/usage/details
+3. Store the key as a secret:
+   `firebase functions:secrets:set ANTHROPIC_API_KEY`
+4. Deploy the function:
+   `firebase deploy --only functions`
 
-At build time Xcode substitutes the value into the app's Info.plist, and
-`AIService` reads it via `Bundle.main.object(forInfoDictionaryKey:)`.
-`Secrets.xcconfig` and `GoogleService-Info.plist` are both in `.gitignore`.
+The iOS app calls the function via the FirebaseFunctions SDK (`AIService.swift`);
+only signed-in users can invoke it, and no API key ships in the app binary.
 
 ## 6. User Registration Flow
 
