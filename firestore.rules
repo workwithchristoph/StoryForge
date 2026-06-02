@@ -1,0 +1,64 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers ----
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function storyData(storyId) {
+      return get(/databases/$(database)/documents/stories/$(storyId)).data;
+    }
+
+    function isInvited(storyId) {
+      return isSignedIn() && request.auth.uid in storyData(storyId).invitedUIDs;
+    }
+
+    function isStoryAuthor(storyId) {
+      return isSignedIn() && request.auth.uid == storyData(storyId).authorUID;
+    }
+
+    // ---- User profiles (needed for invite-by-email lookup) ----
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ---- Stories ----
+    match /stories/{storyId} {
+      allow read: if isSignedIn() &&
+        (request.auth.uid == resource.data.authorUID ||
+         request.auth.uid in resource.data.invitedUIDs);
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.authorUID;
+      // Only the author can edit the story or invite collaborators.
+      allow update: if isSignedIn() &&
+        request.auth.uid == resource.data.authorUID;
+      allow delete: if false;
+
+      // ---- Chapters ----
+      match /chapters/{chapterId} {
+        allow read: if isInvited(storyId);
+        // Only the author adds chapters or sets the winning canon text.
+        allow create, update: if isStoryAuthor(storyId);
+        allow delete: if false;
+
+        // ---- Proposals ----
+        match /proposals/{proposalId} {
+          allow read, create: if isInvited(storyId);
+          // Any invited member can vote (updates voteCount / voterUIDs).
+          allow update: if isInvited(storyId);
+          allow delete: if false;
+
+          // ---- Comments ----
+          match /comments/{commentId} {
+            allow read, create: if isInvited(storyId);
+            allow delete: if false;
+          }
+        }
+      }
+    }
+  }
+}

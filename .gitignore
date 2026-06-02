@@ -1,0 +1,40 @@
+# ---- Secrets (NEVER commit) ----
+Secrets.xcconfig
+GoogleService-Info.plist
+
+# ---- Firebase CLI ----
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# ---- Xcode generated project (regenerated from project.yml via xcodegen) ----
+StoryForge.xcodeproj/
+
+# ---- Xcode ----
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ---- Swift Package Manager ----
+.swiftpm/
+.build/
+Package.resolved
+
+# ---- macOS ----
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# ---- Misc ----
+*.log
